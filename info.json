@@ -1,0 +1,9 @@
+{
+  "name": "Questor",
+  "version": "0.0.1",
+  "factorio_version": "0.17",
+  "title": "Factorio quest creator",
+  "author": "Jonkeda",
+  "description": "Create and run quests, stories and campaigns for Factorio",
+  "dependencies": []
+}
