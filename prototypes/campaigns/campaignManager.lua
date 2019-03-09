@@ -16,9 +16,54 @@ campaignManager.checkDependencies = function(dependencies)
 
 end
 
+campaignManager.getReward_enable_technology = function(player, reward)
+    -- Game.print_all("get reward technology "..reward.value)
+
+    local force = player.force
+    local technology = force.technologies[reward.value]
+    if technology ~= nil then
+        technology.enabled = true
+    end
+end
+
+
+campaignManager.getReward_technology = function(player, reward)
+    -- Game.print_all("get reward technology "..reward.value)
+
+    local force = player.force
+    local technology = force.technologies[reward.value]
+    if technology ~= nil then
+        technology.researched = true
+    end
+end
+
+campaignManager.getReward_recipe = function(player, reward)
+    --Game.print_all("get reward technology "..reward.value)
+
+    local force = player.force
+    local recipe = force.recipes[reward.value]
+    if recipe ~= nil then
+        recipe.enabled = true
+    end
+end
+
+campaignManager.getReward_force = function(player, reward)
+    local force = player.force
+    local modifier = force[reward.value]
+    if modifier ~= nil then
+        force[reward.value] = modifier + reward.amount
+    end
+end
+
+campaignManager.getReward_player = function(player, reward)
+    local modifier = player[reward.value]
+    if modifier ~= nil then
+        player[reward.value] = modifier + reward.amount
+    end
+end
 
 campaignManager.getReward_items = function(player, reward)
-    Game.print_all("get reward items "..reward.value)
+    -- Game.print_all("get reward items "..reward.value)
 
     local inv = player.get_inventory(defines.inventory.player_main)
     inv.insert({ name=reward.value, count=reward.amount })
@@ -30,12 +75,29 @@ campaignManager.getRewards = function(player, quest)
         for ig,reward in pairs(rewards) do
             if reward.functionName == "items" then
                 campaignManager.getReward_items(player, reward)
+
+            elseif reward.functionName == "technology" then
+                campaignManager.getReward_technology(player, reward)
+
+            elseif reward.functionName == "enable_technology" then
+                campaignManager.getReward_enable_technology(player, reward)
+
+            elseif reward.functionName == "recipe" then
+                campaignManager.getReward_recipe(player, reward)
+
+            elseif reward.functionName == "force" then
+                campaignManager.getReward_force(player, reward)
+
+            elseif reward.functionName == "player" then
+                campaignManager.getReward_player(player, reward)
+
             end
         end
     end
 end
 
 campaignManager.onGuiClick = function(event)
+    if not event.element.valid then return end
 
     local event_name = event.element.name
     local playerData = global.questor[event.player_index]
@@ -77,13 +139,15 @@ function campaignManager.updateQuestGui(parent, code, quest)
                 name = "inner"
             }
         for ig,g in pairs(quest.quest.goals) do
-            flow.add
-            {
-                type = 'progressbar',
-                style = "questor_item_description_progressbar",
-                name = "pbValue"..ig,
-                value =  0,
-            }
+            if g.amount ~= nil then
+                flow.add
+                {
+                    type = 'progressbar',
+                    style = "questor_item_description_progressbar",
+                    name = "pbValue"..ig,
+                    value =  0,
+                }
+            end
         end
     elseif quest.goalsPassed then
         local flow = parent[key]
@@ -104,17 +168,19 @@ function campaignManager.updateQuestGui(parent, code, quest)
     else
         local flow = parent[key]
         for ig,g in pairs(quest.quest.goals) do
-            local current = g.current
-            if current == nil then current = 0 end
-            local value
-            if current > g.amount then
-                value = 1
-            else
-                value = current / g.amount
-            end
-            local pb = flow["pbValue"..ig]
-            if pb ~= nil then
-                pb.value = value
+            if g.amount ~= nil then
+                local current = g.current
+                if current == nil then current = 0 end
+                local value
+                if current > g.amount then
+                    value = 1
+                else
+                    value = current / g.amount
+                end
+                local pb = flow["pbValue"..ig]
+                if pb ~= nil then
+                    pb.value = value
+                end
             end
         end
     end
@@ -193,27 +259,113 @@ campaignManager.addCampaigns = function(player_index, player, playerData)
 
 end
 
-campaignManager.items_created = function(player, playerData, goal)
+campaignManager.goal_items_created = function(player, playerData, goal)
     local force = player.force
     local current = force.item_production_statistics.get_input_count(goal.value)
     if current ~= goal.current then
         playerData.runningQuestsChanged = true
         goal.current = current
     end
-    -- Game.print_all("current "..goal.current)
     return goal.current >= goal.amount
 end
 
+campaignManager.goal_entities_created = function(player, playerData, goal)
+    local force = player.force
+    local current = force.entity_build_count_statistics.get_input_count(goal.value)
+    if current ~= goal.current then
+        playerData.runningQuestsChanged = true
+        goal.current = current
+    end
+    return goal.current >= goal.amount
+end
+
+campaignManager.goal_fluids_created = function(player, playerData, goal)
+    local force = player.force
+    local current = force.fluid_production_statistics.get_input_count(goal.value)
+    if current ~= goal.current then
+        playerData.runningQuestsChanged = true
+        goal.current = current
+    end
+    return goal.current >= goal.amount
+end
+
+campaignManager.goal_technology_researched = function(player, playerData, goal)
+    local force = player.force
+    local technology = force.technologies[goal.value]
+    if technology == nil then return false end
+    local current = technology.researched
+    if current ~= goal.current then
+        playerData.runningQuestsChanged = true
+        goal.current = current
+    end
+    return current
+end
+
+campaignManager.goal_items_created_per_minute = function(player, playerData, goal)
+    local force = player.force
+    local current = force.item_production_statistics.get_flow_count({ name = goal.value, input = true, precision_index = defines.flow_precision_index.one_minute})
+    if current ~= goal.current then
+        playerData.runningQuestsChanged = true
+        goal.current = current
+    end
+    return goal.current >= goal.amount
+end
+
+campaignManager.goal_fluids_created_per_minute = function(player, playerData, goal)
+    local force = player.force
+    local current = force.fluid_production_statistics.get_flow_count({ name = goal.value, input = true, precision_index = defines.flow_precision_index.one_minute})
+    if current ~= goal.current then
+        playerData.runningQuestsChanged = true
+        goal.current = current
+    end
+    return goal.current >= goal.amount
+end
+
+campaignManager.goal_technologies_researched = function(player, playerData, goal)
+    local force = player.force
+    local current = 0
+    for ig,technology in pairs(force.technologies) do
+        if technology.researched then
+            current = current + 1
+        end
+    end
+    if current ~= goal.current then
+        playerData.runningQuestsChanged = true
+        goal.current = current
+    end
+    return goal.current >= goal.amount
+end
+
+
 campaignManager.checkQuestGoal = function(player, playerData, quest)
+    if quest.goalsPassed then return end
     local goals = quest.quest.goals
     if goals ~= nil then
         local goalsPassed = true
         for ig,goal in pairs(goals) do
             if goal.functionName == "items_created" then
-                if not campaignManager.items_created(player, playerData, goal) then
-                    goalsPassed = false
-                end
+                goalsPassed = goalsPassed and campaignManager.goal_items_created(player, playerData, goal)
+
+            elseif goal.functionName == "items_created_per_minute" then
+                goalsPassed = goalsPassed and campaignManager.goal_items_created_per_minute(player, playerData, goal)
+
+            elseif goal.functionName == "entities_created" then
+                goalsPassed = goalsPassed and campaignManager.goal_entities_created(player, playerData, goal)
+
+            elseif goal.functionName == "fluids_created" then
+                goalsPassed = goalsPassed and campaignManager.goal_fluids_created(player, playerData, goal)
+
+            elseif goal.functionName == "fluids_created_per_minute" then
+                goalsPassed = goalsPassed and campaignManager.goal_fluids_created_per_minute(player, playerData, goal)
+
+            elseif goal.functionName == "technology_researched" then
+                goalsPassed = goalsPassed and campaignManager.goal_technology_researched(player, playerData, goal)
+
+            elseif goal.functionName == "technologies_researched" then
+                goalsPassed = goalsPassed and campaignManager.goal_technologies_researched(player, playerData, goal)
+
             end
+
          end
          quest.goalsPassed = goalsPassed
     end

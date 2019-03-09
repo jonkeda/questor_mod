@@ -10,6 +10,9 @@ require("prototypes.campaigns.campaignManager")
 
 global.runOnce = false
 
+local debug = false
+local debugset = false
+
 function init_questor()
 
     campaignManager.initCampaign()
@@ -47,6 +50,15 @@ function onGuiClick(event)
 end
 
 function bootstrap()
+    if debug then
+        if not debugset then
+            debugset = true
+            for i,player in pairs(game.players) do
+                player.force.research_all_technologies()
+                player.cheat_mode=true
+            end
+        end
+    end
 
     script.on_event(defines.events.on_tick, OnTick)
     OnTick(event)

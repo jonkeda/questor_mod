@@ -2,6 +2,8 @@ require("exporter")
 
 --testing GUI events
 function on_gui_click(event)
+    if not event.element.valid then return end
+
 	local player = game.players[event.player_index]
     local event_name = event.element.name
     
